@@ -12,7 +12,7 @@
 SHELL := /bin/bash
 COMPOSE ?= docker compose
 
-.PHONY: help setup up down restart logs smoke load alert trace drift demo verify clean lint-dashboards
+.PHONY: help setup up down restart logs smoke load alert trace drift demo verify clean lint-dashboards bonus-b1 bonus-b2 bonus-all bonus-profiled bonus-langfuse-trace
 
 help:
 	@grep -E '^##|^[a-zA-Z_-]+:.*?## ' Makefile | sed -E 's/^## ?//; s/:.*## /\t/' | column -t -s $$'\t'
@@ -39,7 +39,7 @@ smoke: ## health-check all 7 services
 	@curl -fsS http://localhost:8000/healthz   > /dev/null && echo "  app:           OK"
 	@curl -fsS http://localhost:9090/-/healthy > /dev/null && echo "  prometheus:    OK"
 	@curl -fsS http://localhost:9093/-/healthy > /dev/null && echo "  alertmanager:  OK"
-	@curl -fsS http://localhost:3000/api/health | grep -q '"database":"ok"' && echo "  grafana:       OK"
+	@curl -fsS http://localhost:3000/api/health | grep -q '"database": "ok"' && echo "  grafana:s       OK"
 	@curl -fsS http://localhost:3100/ready     > /dev/null && echo "  loki:          OK"
 	@curl -fsS http://localhost:16686/         > /dev/null && echo "  jaeger:        OK"
 	@curl -fsS http://localhost:8888/metrics   > /dev/null && echo "  otel-collector: OK"
@@ -74,3 +74,16 @@ lint-dashboards: ## validate Grafana dashboard JSONs
 
 clean: ## stop stack + remove volumes (DESTRUCTIVE)
 	$(COMPOSE) down -v
+
+bonus-b1: ## BONUS B1: start Pyroscope continuous profiler
+	$(COMPOSE) --profile bonus-b1 up -d pyroscope
+	@echo "Pyroscope UI: http://localhost:4040"
+	@echo "Install Grafana Phlare plugin: grafana-cli plugins install phlare"
+	@echo "Then add datasource: http://localhost:4040 (type: phlare)"
+
+bonus-b2: ## BONUS B2: start Langfuse LLM observability
+	$(COMPOSE) --profile bonus-b2 up -d langfuse langfuse-postgres
+	@echo "Langfuse UI: http://localhost:3001"
+	@echo "Login: user@langfuse.com / langfuse123"
+
+bonus-all: bonus-b1 bonus-b2 ## BONUS B1+B2: start all bonus services

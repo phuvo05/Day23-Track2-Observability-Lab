@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: day23-langfuse-postgres
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks: [langfuse-net]
+    restart: unless-stopped
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: day23-langfuse
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      # Langfuse v2: PostgreSQL only (no ClickHouse needed)
+      DATABASE_URL: postgresql://langfuse:langfuse123@postgres:5432/langfuse
+      NEXTAUTH_SECRET: langfuse-dev-secret-for-local-lab-32chars
+      NEXTAUTH_URL: http://localhost:3001
+      SALT: langfuse-salt-for-hashing-local-dev-32
+      TELEMETRY_ENABLED: "false"
+      # Create default admin user on first start
+      LANGFUSE_INIT_ORG_ID: org_01
+      LANGFUSE_INIT_ORG_NAME: Day23 Lab
+      LANGFUSE_INIT_PROJECT_ID: proj_day23
+      LANGFUSE_INIT_PROJECT_NAME: Inference API
+      LANGFUSE_INIT_USER_EMAIL: admin@day23.local
+      LANGFUSE_INIT_USER_NAME: Admin
+      LANGFUSE_INIT_USER_PASSWORD: langfuse123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [langfuse-net]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  langfuse-net:
+    driver: bridge

@@ -1,0 +1,152 @@
+{
+  "title": "Langfuse — LLM Observability (Day 23)",
+  "uid": "day23-langfuse",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "type": "stat", "title": "Total Traces (last 1h)",
+      "id": 1, "gridPos": {"x": 0, "y": 0, "w": 8, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{
+        "expr": "sum(increase(langfuse_trace_count_total[1h]))",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "blue", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          }
+        }
+      },
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "type": "stat", "title": "Avg Latency (ms)",
+      "id": 2, "gridPos": {"x": 8, "y": 0, "w": 8, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{
+        "expr": "1000 * avg(increase(langfuse_llm_latency_seconds_sum[1h]) / increase(langfuse_llm_latency_seconds_count[1h]))",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 500},
+              {"color": "red", "value": 2000}
+            ]
+          }
+        }
+      },
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "type": "stat", "title": "Total Tokens (in+out) / hr",
+      "id": 3, "gridPos": {"x": 16, "y": 0, "w": 8, "h": 7},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{
+        "expr": "3600 * sum(rate(langfuse_tokens_total[5m]))",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 50000},
+              {"color": "red", "value": 200000}
+            ]
+          }
+        }
+      },
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "type": "timeseries", "title": "LLM Latency P50 / P95 / P99 (ms)",
+      "id": 4, "gridPos": {"x": 0, "y": 7, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "1000 * histogram_quantile(0.50, sum by (le) (rate(langfuse_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "P50", "refId": "A"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(langfuse_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "P95", "refId": "B"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.99, sum by (le) (rate(langfuse_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "P99", "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 500},
+              {"color": "red", "value": 2000}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries", "title": "Token Throughput (in / out tokens per sec)",
+      "id": 5, "gridPos": {"x": 12, "y": 7, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (direction) (rate(langfuse_tokens_total{direction=\"input\"}[1m]))",
+          "legendFormat": "input", "refId": "A"
+        },
+        {
+          "expr": "sum by (direction) (rate(langfuse_tokens_total{direction=\"output\"}[1m]))",
+          "legendFormat": "output", "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "table", "title": "Recent Traces",
+      "id": 6, "gridPos": {"x": 0, "y": 15, "w": 24, "h": 8},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{
+        "expr": "{job=\"day23-app\"} | json | __error__=\"\" | limit 5",
+        "refId": "A",
+        "instant": true,
+        "legendFormat": "{{trace_id}}"
+      }]
+    }
+  ]
+}

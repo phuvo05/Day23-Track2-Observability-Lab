@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
 
 import structlog
 from opentelemetry import trace
@@ -77,23 +78,98 @@ def setup_otel() -> None:
 
 
 def _configure_logging() -> None:
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=os.getenv("LOG_LEVEL", "INFO"),
-    )
-    structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer(),
-        ],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-        logger_factory=structlog.PrintLoggerFactory(),
-        cache_logger_on_first_use=True,
-    )
+    log_file = os.getenv("LOG_FILE")
+    log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO"), logging.INFO)
+
+    if log_file:
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        _file = open(log_file, "a", encoding="utf-8")
+
+        class _FileLoggerFactory:
+            """structlog factory that writes structured JSON to a shared file handle.
+            Holds a single PrintLogger instance; cache ensures structlog.get_logger()
+            returns the same logger object each time.
+            """
+
+            def __call__(self, _: str):
+                if not hasattr(self, "_logger"):
+                    self._logger = structlog.PrintLoggerFactory(file=_file)()
+                return self._logger
+
+        structlog.configure(
+            processors=[
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.JSONRenderer(),
+            ],
+            wrapper_class=structlog.make_filtering_bound_logger(log_level),
+            logger_factory=_FileLoggerFactory(),
+            cache_logger_on_first_use=True,
+        )
+    else:
+        logging.basicConfig(
+            format="%(message)s",
+            stream=sys.stdout,
+            level=log_level,
+        )
+        structlog.configure(
+            processors=[
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.JSONRenderer(),
+            ],
+            wrapper_class=structlog.make_filtering_bound_logger(log_level),
+            logger_factory=structlog.PrintLoggerFactory(),
+            cache_logger_on_first_use=True,
+        )
+
+
+# ── Global logger (initialized lazily on first use after setup_otel()) ─
+_log_name: str | None = None
 
 
 def bind_log(name: str) -> structlog.BoundLogger:
+    """Return a structlog logger. Always calls get_logger() to pick up the
+    current global config (configured by _configure_logging at startup)."""
     return structlog.get_logger(name)
+
+
+# ── BONUS B1: Pyroscope continuous profiling ─────────────────────────
+# Activated when PYROSCOPE_SERVER_ADDRESS is set.
+# Python SDK sends CPU/Wall profiles to the Pyroscope server over HTTP.
+# Works on any OS (Windows included) — Python instrumentation replaces eBPF.
+
+def setup_pyroscope() -> bool:
+    """Configure Pyroscope profiling if PYROSCOPE_SERVER_ADDRESS is set.
+
+    Returns True if pyroscope is active, False otherwise.
+    Call this after setup_otel() in the app lifespan.
+    """
+    import sys
+    server = os.getenv("PYROSCOPE_SERVER_ADDRESS", "")
+    print(f"[pyroscope] PYROSCOPE_SERVER_ADDRESS={server!r}", file=sys.stderr)
+    if not server:
+        return False
+    try:
+        import pyroscope_io
+        pyroscope_io.configure(
+            application_name="day23-app",
+            server_address=server,
+            sample_rate=100,
+            oncpu=True,
+            enable_logging=True,
+            tags={
+                "service": "inference-api",
+                "environment": os.getenv("DEPLOY_ENV", "lab"),
+            },
+        )
+        print("[pyroscope] configure() called successfully", file=sys.stderr)
+        return True
+    except ImportError:
+        print("[pyroscope] pyroscope-io not installed", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"[pyroscope] configure() failed: {e}", file=sys.stderr)
+        return False

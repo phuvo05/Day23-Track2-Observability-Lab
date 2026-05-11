@@ -95,7 +95,7 @@ def main() -> int:
     reflection = SUBMISSION / "REFLECTION.md"
     results.append(check(
         "submission: REFLECTION.md exists and is non-trivial",
-        reflection.exists() and len(reflection.read_text()) > 500,
+        reflection.exists() and len(reflection.read_text(encoding="utf-8")) > 500,
     ))
 
     print()

@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  # Pyroscope / Grafana Phlare-compatible datasource (continuous CPU profiling)
+  # Grafana needs the Phlare/Pyroscope datasource plugin installed.
+  # Install via: grafana-cli plugins install phlare
+  - name: Pyroscope
+    type: phlare
+    uid: pyroscope
+    access: proxy
+    url: http://pyroscope:4040
+    editable: false
+    jsonData:
+      httpMethod: POST
+      minInterval: 15s

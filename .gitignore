@@ -9,9 +9,12 @@ venv/
 # Lab artifacts (generated)
 benchmarks/*.csv
 benchmarks/*.json
-submission/screenshots/*.png
+
 submission/screenshots/*.jpg
 
 # Local OS junk
 .DS_Store
 Thumbs.db
+
+# Local logs
+logs/

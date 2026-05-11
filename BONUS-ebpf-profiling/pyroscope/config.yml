@@ -1,0 +1,18 @@
+# Pyroscope 1.20 config — minimal, uses defaults for everything except ports
+server:
+  http-listen-address: "0.0.0.0"
+  http-port: 4040
+  grpc-listen-address: "0.0.0.0"
+  grpc-port: 9090
+
+blocks-storage:
+  backend: filesystem
+  filesystem:
+    data-directory: /var/lib/pyroscope/blocks
+
+auth:
+  multitenancy-enabled: false
+
+log:
+  level: info
+  format: text
